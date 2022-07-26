@@ -6,6 +6,9 @@
 
 #include <WiFiClient.h>
 #include <PubSubClient.h>
+#include <DHT.h>
+#define DHT_SENSOR_PIN  21 // ESP32 pin GIOP21 connected to DHT11 sensor
+#define DHT_SENSOR_TYPE DHT11
 
 const char *ssid = "kebaratan"; 
 const char *password = "Wifinyalemot";
@@ -16,12 +19,16 @@ const char *password = "Wifinyalemot";
 WiFiClient espClient;
 PubSubClient client(espClient);
 
+DHT dht_sensor(DHT_SENSOR_PIN, DHT_SENSOR_TYPE);
+
 // sending data every 2 sec
 const int period = 2000;
 unsigned long lastTime = 0;
 
 void setup() {
   Serial.begin(9600);
+
+  dht_sensor.begin(); // initialize the DHT sensor
   
   WiFi.mode(WIFI_STA);
   WiFi.begin(ssid, password);
@@ -51,18 +58,26 @@ void loop() {
 
   if(currentMilis - lastTime >= period){
 
-    String payload = String(random(1, 100));
-    
-    bool isSuccess = client.publish("webinar123/temperature", payload.c_str());
+    // read temperature in Celsius
+    float tempC = dht_sensor.readTemperature();
 
-    if(!isSuccess){
-      reconnect();
+    if (isnan(tempC)) {
+      Serial.println("Failed to read from DHT sensor!");
+    } else {
+      
+      bool isSuccess = client.publish("webinar123/temperature", String(tempC).c_str());
+
+      if(!isSuccess){
+        reconnect();
+      }
+
+      Serial.print("Temperature: ");
+      Serial.print(tempC);
+      Serial.print("°C");
+
+      Serial.print(", success: ");
+      Serial.println(isSuccess);
     }
-
-    Serial.print("payload: ");
-    Serial.print(payload);
-    Serial.print(", success: ");
-    Serial.println(isSuccess);
     
     lastTime = currentMilis;
   }
